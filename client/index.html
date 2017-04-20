@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <script src="https://ajax.aspnetcdn.com/ajax/jQuery/jquery-1.12.4.min.js"></script>
+    <script src="html2canvas.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+
+    <style>
+    #map {
+    height: 512px;
+    width: 512px;
+    }
+
+    #bar{
+      margin: 20px;
+      width: 45%;
+      height:25px;
+      border:1px solid black;
+      position:relative;
+    }
+    #slider{
+      width:0%;
+      height:100%;
+      background-color:blue;
+      top:0px;
+      left:0px;
+      position:absolute;
+      cursor:pointer;
+    }
+    #info{
+      width:200px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    </style>
+  </head>
+  <body onload = "init()">
+    <nav class="navbar navbar-light bg-faded" style="background-color: #292b2c;">
+        <div class="branding" style="color:white">
+          <h1 class="navbar-brand"> <span style="font-size: 41px">AIONN</span>Automatic Image Object Recognition</h1>
+        </div>
+
+    </nav>
+    <div class="container-fluid">
+      <div class="row">
+        <div style="width:100%;">
+          <div id="map" style="width:500px; height:500px; margin-left:10px; display:inline-block;"></div>Referance Window
+          <div id="map2" style="width:500px; height:500px; margin-left:50px;display:inline-block;"> </div>Resulting Heatlayer
+        </div>
+
+      
+          <div id = "buttons">
+          <button onclick="addClass('parking',sliderValue)"> PARKING </button>
+          <button onclick="addClass('mosque',sliderValue)"> MOSQUE </button>
+          <button onclick="addClass('houses',sliderValue)"> HOUSES </button>
+          <button onclick="addClass('roads',sliderValue)"> ROADS </button>
+          <button onclick="addClass('tennis',sliderValue)"> TENNIS </button>
+          <button onclick="addClass('grass',sliderValue)"> GRASS </button>
+          <button onclick="addClass('ground',sliderValue)"> GROUND </button>
+          <button onclick="addClass('ponds',sliderValue)"> PONDS </button>
+          <button onclick="addClass('kilns',sliderValue)"> KILNS </button>
+          <button onclick="addClass('farms',sliderValue)"> FARMS </button>
+          <button onclick="addClass('blackfarms',sliderValue)"> BLACK FARMS </button>
+          <button onclick="addClass('oiltanks',sliderValue)"> OIL TANKS </button>
+          <button onclick="addClass('densetrees',sliderValue)"> DENSE TREES </button>
+          <button onclick="addClass('parks',sliderValue)"> PARKS </button>
+        </div> 
+        <div id='bar'>
+          <div id='slider'>
+          </div>
+        </div>
+<br />
+
+<div id='info'>0.00%</div>
+
+        <button onclick = 'go()' id = "go" > Execute </button>
+      </div>
+    </div>
+    <div class="container">
+      <div class="row">
+        <div id = "progress" class="progress" style="visibility:hidden">
+          <div id = "ProgressStatus" class="progress-bar progress-bar-success" role="progressbar" aria-valuenow="40" aria-valuemin="0" aria-valuemax="100" style="width:10%">
+            10% Complete (success)
+          </div>
+        </div>
+      </div>
+    </div>
+
+    </body>
+ <script src="/socket.io/socket.io.js"></script>
+
+    <script>  
+    var bar, slider;
+    var curClass;
+    var map;  
+    var map2;
+    var classLayers;
+    var sliderValue = 0.0;
+    var server = io.connect();
+    var prob_Cordinates = {} ;
+        var heatMapData = [];
+        var mapcenter = {};
+
+    function init(){
+      
+      bar = document.getElementById('bar');
+      slider = document.getElementById('slider');
+      info = document.getElementById('info');
+      bar.addEventListener('mousedown', startSlide, false); 
+      bar.addEventListener('mouseup', stopSlide, false);
+    }
+    function startSlide(event){
+      var set_perc = ((((event.clientX - bar.offsetLeft) / bar.offsetWidth)).toFixed(2));
+      info.innerHTML =  set_perc + '%';  
+      bar.addEventListener('mousemove', moveSlide, false);  
+      slider.style.width = (set_perc * 100) + '%';  
+    }
+    function moveSlide(event){
+      var set_perc = ((((event.clientX - bar.offsetLeft) / bar.offsetWidth)).toFixed(2));
+      info.innerHTML =  set_perc + '%';
+      slider.style.width = (set_perc * 100) + '%';
+    }
+    function stopSlide(event){
+      var set_perc = ((((event.clientX - bar.offsetLeft) / bar.offsetWidth)).toFixed(2));
+      info.innerHTML = set_perc + '%';
+      bar.removeEventListener('mousemove', moveSlide, false);
+      sliderValue = set_perc;
+      slider.style.width = (set_perc * 100) + '%';
+      addClass(curClass, sliderValue);
+    }
+
+
+    function addClass(cl,conf) {
+      curClass = cl;
+      prob_Cordinates = classLayers[cl].filter(function(x) {
+        return x.split(' ').map(parseFloat)[2] >= conf;
+      });
+   //   console.log("here")
+    //  console.log(prob_Cordinates)
+            center = {};
+            center[0] = 0.000;
+            center[1] = 1.000;
+            data = {}
+            heatMapData = [];
+         //   console.log(prob_Cordinates.length)
+            for(i = 0; i < prob_Cordinates.length; i++){
+
+              data[i] = prob_Cordinates[i].split(' ').map(parseFloat);      
+              center[0] += data[i][1];
+              center[1] += data[i][0];
+              heatMapData[i] = {location: new google.maps.LatLng(data[i][1], data[i][0]), weight: data[i][2]}
+            }
+            
+            
+            // /////////////////////////////////////////////////////////////////////////////////////
+            var customCenter = new google.maps.LatLng( center[0]/prob_Cordinates.length, center[1]/prob_Cordinates.length );
+            
+            var newMap;
+            newMap = new google.maps.Map(document.getElementById('map2'), {
+              center: customCenter,
+              zoom: 16,
+              mapTypeId: 'satellite'
+            });
+
+            var heatmap = new google.maps.visualization.HeatmapLayer({
+            data: heatMapData
+            });
+            newMap.setZoom(map.getZoom());
+            newMap.setCenter(map.getCenter());
+            
+            heatmap.setMap(newMap);
+    }
+    
+    server.on("progressTarget", data=>{
+      document.getElementById("progress").style.visibility = 'visible';
+      document.getElementById("ProgressStatus").textContent = data + "% success";
+      document.getElementById("ProgressStatus").style.width = data+'%';
+ //     console.log(data);
+
+    })
+    server.on("corFile", data=>{
+     // console.log(data.x)
+            classLayers = data;
+            addClass("parking",sliderValue);
+});
+
+    function go() {
+      var currentPosition=map.getCenter();
+ var abc=  "http://maps.google.com/maps/api/staticmap?sensor=false&center=" +
+  currentPosition.lat() + "," + currentPosition.lng() + "&maptype=satellite"+
+  "&zoom="+map.getZoom()+"&size=512x512&" +
+  currentPosition.lat() + ',' + currentPosition.lng();
+
+       server.emit('go',{cor : map.getBounds()});
+    }
+        var lines = {} ;
+    var lines1 = {};
+    var bool = true;
+
+          var openFile = function(event) {
+           
+        var input = event.target;
+        var reader = new FileReader();
+
+        reader.readAsText(input.files[0]);
+        
+      };
+
+
+      function initMap() {
+         setInterval(function(){
+          if (bool == true) {
+            
+           var cen = {lat: 31.4704, lng: 74.4108};
+         map = new google.maps.Map(document.getElementById('map'), {
+          zoom: 16,
+          center: cen,
+  mapTypeId: 'satellite'
+        });
+
+        map2 = new google.maps.Map(document.getElementById('map2'), {
+          zoom: 16,
+          center: cen,
+          mapTypeId: 'satellite'
+          });
+
+        for (i = 0 ; i < lines.length;i++) {
+          var uluru = {lat: parseFloat(lines1[i]), lng: parseFloat(lines[i])};
+        var marker = new google.maps.Marker({
+          position: uluru,
+          map: map,
+          icon: 'im.png'
+        });
+      }
+        bool = false;
+      }
+  },2000);
+  }
+    </script>
+    <script async defer
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAd33iPrydbR8cnjSFILr6Hkxg2R93szw8&libraries=visualization&callback=initMap">
+    </script>
+
+</html>
